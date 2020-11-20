@@ -655,13 +655,15 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		c.Logger().Errorf("failed to begin tx: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	defer tx.Rollback()
-	for _, row := range records {
+	// estates := []Estate{}
+	var builder strings.Builder
+	for i, row := range records {
 		rm := RecordMapper{Record: row}
 		id := rm.NextInt()
 		name := rm.NextString()
@@ -675,15 +677,42 @@ func postEstate(c echo.Context) error {
 		doorWidth := rm.NextInt()
 		features := rm.NextString()
 		popularity := rm.NextInt()
+		// estate := Estate{
+		// 	ID:          int64(id),
+		// 	Name:        name,
+		// 	Description: description,
+		// 	Thumbnail:   thumbnail,
+		// 	Address:     address,
+		// 	Latitude:    latitude,
+		// 	Longitude:   longitude,
+		// 	Rent:        int64(rent),
+		// 	DoorHeight:  int64(doorHeight),
+		// 	DoorWidth:   int64(doorWidth),
+		// 	Features:    features,
+		// 	Popularity:  int64(popularity),
+		// }
 		if err := rm.Err(); err != nil {
 			c.Logger().Errorf("failed to read record: %v", err)
 			return c.NoContent(http.StatusBadRequest)
 		}
-		_, err := tx.Exec("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
-		if err != nil {
-			c.Logger().Errorf("failed to insert estate: %v", err)
-			return c.NoContent(http.StatusInternalServerError)
+		if i == 0 {
+			fmt.Fprintf(&builder, "INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES")
+			fmt.Fprintf(&builder, "(%v,'%v','%v','%v','%v',%v,%v,%v,%v,%v,'%v',%v)", id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
+		} else {
+			fmt.Fprintf(&builder, ",(%v,'%v','%v','%v','%v',%v,%v,%v,%v,%v,'%v',%v)", id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
 		}
+		// estates = append(estates, estate)
+		// if err != nil {
+		// 	c.Logger().Errorf("failed to insert estate: %v", err)
+		// 	return c.NoContent(http.StatusInternalServerError)
+		// }
+	}
+	// _, err := tx.NamedExec("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity)
+	_, err = tx.Exec(builder.String())
+	// _, err = tx.NamedExec("INSERT INTO estate (e) VALUES (:e)", estates)
+	if err != nil {
+		c.Logger().Errorf("failed to insert estate: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
 	}
 	if err := tx.Commit(); err != nil {
 		c.Logger().Errorf("failed to commit tx: %v", err)
