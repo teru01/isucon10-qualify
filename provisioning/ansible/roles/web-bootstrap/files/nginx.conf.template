@@ -17,6 +17,8 @@ http {
                      '"$request" $status $body_bytes_sent '
                      '"$http_referer" "$http_user_agent" $request_time';
     access_log  /var/log/nginx/access.log  main;
+    log_format apm '$request_time $upstream_response_time';
+    access_log /var/log/nginx/apm.log apm;
     server {
         listen 80 default_server;
         listen [::]:80 default_server;
